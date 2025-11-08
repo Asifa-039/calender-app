@@ -1,217 +1,175 @@
-import React, { useMemo, useState } from "react";
-import { useCalendar } from "../context/CalendarContext";
-import AddEventModal from "./AddEventModal";
-import { Trash2, ChevronLeft, ChevronRight, CalendarDays, RotateCcw } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import AddEventModal from "./AddEventModal.jsx";
 
-const Calendar = () => {
-  const {
-    events,
-    setEvents,
-    currentDate,
-    setCurrentDate,
-    selectedDate,
-    setSelectedDate,
-    viewMode,
-    setViewMode,
-  } = useCalendar();
+function Calendar() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [events, setEvents] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem("calendarEvents")) || [];
+    return saved;
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Save to localStorage whenever events change
+  useEffect(() => {
+    localStorage.setItem("calendarEvents", JSON.stringify(events));
+  }, [events]);
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const monthName = currentDate.toLocaleString("default", { month: "long" });
-
-  const firstDay = new Date(year, month, 1).getDay();
-  const totalDays = new Date(year, month + 1, 0).getDate();
-
-  const days = useMemo(() => {
-    const arr = [];
-    for (let i = 0; i < firstDay; i++) arr.push(null);
-    for (let i = 1; i <= totalDays; i++) arr.push(i);
-    return arr;
-  }, [month, year]);
-
-  const handleAddEvent = (newEvent) => {
+  // Add new event
+  const addEvent = (newEvent) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const eventDate = new Date(newEvent.date);
-    eventDate.setHours(0, 0, 0, 0);
 
-    const type = eventDate < today ? "completed" : "upcoming";
-    setEvents((prev) => [...prev, { ...newEvent, type }]);
+    const eventType =
+      eventDate < today.setHours(0, 0, 0, 0) ? "completed" : "upcoming";
+
+    const updatedEvents = [
+      ...events,
+      { ...newEvent, type: eventType, id: Date.now() },
+    ];
+
+    setEvents(updatedEvents);
+    localStorage.setItem("calendarEvents", JSON.stringify(updatedEvents));
   };
 
-  const handleDeleteEvent = (date, title) => {
-    setEvents((prev) =>
-      prev.filter(
-        (event) =>
-          event.date.toDateString() !== date.toDateString() ||
-          event.title !== title
-      )
-    );
+  const deleteEvent = (id) => {
+    const updated = events.filter((event) => event.id !== id);
+    setEvents(updated);
+    localStorage.setItem("calendarEvents", JSON.stringify(updated));
   };
 
-  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
-  const handleToday = () => {
-    const today = new Date();
-    setCurrentDate(today);
-    setSelectedDate(today);
-    setViewMode("month");
-  };
+  const daysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 
-  const handleDateClick = (day) => {
-    if (!day) return;
-    const date = new Date(year, month, day);
-    setSelectedDate(date);
-    setIsModalOpen(true);
-  };
+  const month = currentDate.getMonth();
+  const year = currentDate.getFullYear();
+  const days = [];
+  const totalDays = daysInMonth(year, month);
+  const startingDay = firstDayOfMonth(year, month);
 
-  const getEventsForDay = (day) => {
-    const date = new Date(year, month, day);
-    return events.filter(
-      (event) => event.date.toDateString() === date.toDateString()
-    );
-  };
+  for (let i = 0; i < startingDay; i++) {
+    days.push(null);
+  }
+  for (let i = 1; i <= totalDays; i++) {
+    days.push(new Date(year, month, i));
+  }
 
-  const currentDayEvents = events.filter(
-    (event) => event.date.toDateString() === selectedDate.toDateString()
-  );
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+
+  const formatDate = (date) => date.toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+
+  const handleDayClick = (date) => {
+    setSelectedDate(formatDate(date));
+    setShowModal(true);
+  };
 
   return (
-    <div className="p-8 transition-all duration-300">
-      <h1 className="text-3xl font-bold text-gray-800 mb-4">Welcome to CALENDAR</h1>
-
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-4">
         <button
-          onClick={handlePrevMonth}
-          className="flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition"
+          onClick={prevMonth}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
         >
-          <ChevronLeft size={18} /> Prev
+          Prev
         </button>
-
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            {monthName} {year}
-          </h2>
-          <p className="text-sm text-gray-500">
-            {viewMode === "month"
-              ? "Month View"
-              : `Day View - ${selectedDate.toDateString()}`}
-          </p>
-        </div>
-
+        <h2 className="text-2xl font-semibold text-gray-800">
+          {currentDate.toLocaleString("default", { month: "long" })} {year}
+        </h2>
         <div className="flex gap-2">
           <button
-            onClick={handleToday}
-            className="flex items-center gap-1 px-3 py-2 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition"
+            onClick={() => {
+              setSelectedDate(null);
+              setShowModal(true);
+            }}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            <RotateCcw size={16} /> Today
+            + Add Event
           </button>
-
           <button
-            onClick={() =>
-              setViewMode((prev) => (prev === "month" ? "day" : "month"))
-            }
-            className="flex items-center gap-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition"
+            onClick={nextMonth}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
           >
-            <CalendarDays size={18} />
-            {viewMode === "month" ? "Day View" : "Month View"}
-          </button>
-
-          <button
-            onClick={handleNextMonth}
-            className="flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition"
-          >
-            Next <ChevronRight size={18} />
+            Next
           </button>
         </div>
       </div>
 
-      {/* Month View */}
-      {viewMode === "month" && (
-        <div className="grid grid-cols-7 gap-4 text-center">
-          {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
-            <div key={d} className="font-semibold text-gray-600 uppercase text-sm">
-              {d}
-            </div>
-          ))}
-          {days.map((day, i) => {
-            const dayEvents = day ? getEventsForDay(day) : [];
-            const isSelected =
-              selectedDate &&
-              day &&
-              selectedDate.toDateString() ===
-                new Date(year, month, day).toDateString();
+      <div className="grid grid-cols-7 gap-2 text-center font-semibold mb-2 text-gray-700">
+        <div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-2">
+        {days.map((date, index) => {
+          if (!date) {
             return (
-              <div
-                key={i}
-                onClick={() => handleDateClick(day)}
-                className={`min-h-[100px] border rounded-lg p-2 text-left cursor-pointer transition ${
-                  day
-                    ? `${
-                        dayEvents.length > 0 || isSelected
-                          ? "bg-blue-100 shadow-md"
-                          : "hover:bg-blue-100"
-                      }`
-                    : "bg-transparent cursor-default"
-                }`}
-              >
-                {day && <div className="font-medium">{day}</div>}
-                {dayEvents.map((event, idx) => (
+              <div key={index} className="p-4 border rounded bg-gray-100"></div>
+            );
+          }
+
+          const formatted = formatDate(date);
+          const dayEvents = events.filter((event) => event.date === formatted);
+          const isToday = formatted === today;
+
+          return (
+            <div
+              key={index}
+              onClick={() => handleDayClick(date)}
+              className={`p-2 border rounded h-28 overflow-y-auto cursor-pointer transition ${
+                isToday ? "bg-blue-100" : "hover:bg-blue-50"
+              }`}
+            >
+              <div className="font-bold text-sm mb-1 text-gray-800">
+                {date.getDate()}
+              </div>
+
+              {dayEvents.length > 0 ? (
+                dayEvents.map((event) => (
                   <div
-                    key={idx}
-                    className={`text-xs px-2 py-1 rounded mt-1 ${
-                      event.type === "upcoming"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-700 line-through"
+                    key={event.id}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`relative text-xs p-1 mb-1 rounded text-white ${
+                      event.type === "completed"
+                        ? "bg-gray-500 line-through"
+                        : "bg-green-500"
                     }`}
                   >
                     {event.title}
+                    <br />
+                    {event.startTime} - {event.endTime}
+                    <button
+                      onClick={() => deleteEvent(event.id)}
+                      className="absolute top-0 right-1 text-[10px] text-white hover:text-red-300"
+                    >
+                      ❌
+                    </button>
                   </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                ))
+              ) : (
+                <div className="text-gray-400 text-xs">No events</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Day View */}
-      {viewMode === "day" && (
-        <div className="mt-6 p-4 bg-gray-50 border rounded-md">
-          <h3 className="text-xl font-semibold mb-2">
-            Events on {selectedDate.toDateString()}
-          </h3>
-          {currentDayEvents.length === 0 ? (
-            <p className="text-gray-500">No events for this day</p>
-          ) : (
-            currentDayEvents.map((event, idx) => (
-              <div
-                key={idx}
-                className="flex justify-between items-center bg-white p-3 rounded-md shadow-sm mb-2"
-              >
-                <span>{event.title}</span>
-                <Trash2
-                  size={16}
-                  className="text-red-500 cursor-pointer hover:text-red-700"
-                  onClick={() => handleDeleteEvent(event.date, event.title)}
-                />
-              </div>
-            ))
-          )}
-        </div>
+      {showModal && (
+        <AddEventModal
+          onClose={() => setShowModal(false)}
+          onAdd={(newEvent) =>
+            addEvent({ ...newEvent, date: selectedDate || newEvent.date })
+          }
+        />
       )}
-
-      <AddEventModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddEvent}
-        selectedDate={selectedDate}
-      />
     </div>
   );
-};
+}
 
 export default Calendar;
